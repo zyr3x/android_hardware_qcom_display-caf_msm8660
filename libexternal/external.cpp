@@ -373,6 +373,10 @@ void ExternalDisplay::resetInfo()
 
 int ExternalDisplay::getModeOrder(int mode)
 {
+  
+    char property_value[PROPERTY_VALUE_MAX];
+    property_get("hw.hdmi.limit_to_720p", property_value, "1");
+    int limit_to_720p = atoi(property_value);
     // XXX: We dont support interlaced modes but having
     // it here for future
     switch (mode) {
@@ -386,7 +390,7 @@ int ExternalDisplay::getModeOrder(int mode)
         case HDMI_VFRMT_1440x576i50_16_9:
             return 4; // 576i 16:9
         case HDMI_VFRMT_1920x1080i60_16_9:
-            return 5; // 1080i 16:9
+            return limit_to_720p ? -1 :5; // 1080i 16:9
         case HDMI_VFRMT_640x480p60_4_3:
             return 6; // 640x480 4:3
         case HDMI_VFRMT_720x480p60_4_3:
@@ -404,25 +408,25 @@ int ExternalDisplay::getModeOrder(int mode)
         case HDMI_VFRMT_1280x720p60_16_9:
             return 13; // 720p@60Hz
         case HDMI_VFRMT_1920x1080p24_16_9:
-            return 14; //1080p@24Hz
+            return limit_to_720p ? -1 :14; //1080p@24Hz
         case HDMI_VFRMT_1920x1080p25_16_9:
-            return 15; //108-p@25Hz
+            return limit_to_720p ? -1 :15; //108-p@25Hz
         case HDMI_VFRMT_1920x1080p30_16_9:
-            return 16; //1080p@30Hz
+            return limit_to_720p ? -1 :16; //1080p@30Hz
         case HDMI_VFRMT_1920x1080p50_16_9:
-            return 17; //1080p@50Hz
+            return limit_to_720p ? -1 :17; //1080p@50Hz
         case HDMI_VFRMT_1920x1080p60_16_9:
-            return 18; //1080p@60Hz
+            return limit_to_720p ? -1 :18; //1080p@60Hz
         case HDMI_VFRMT_2560x1600p60_16_9:
-            return 19; //WQXGA@60Hz541
+            return limit_to_720p ? -1 :19; //WQXGA@60Hz541
         case HDMI_VFRMT_3840x2160p24_16_9:
-            return 20;//2160@24Hz
+            return limit_to_720p ? -1 :20;//2160@24Hz
         case HDMI_VFRMT_3840x2160p25_16_9:
-            return 21;//2160@25Hz
+            return limit_to_720p ? -1 :21;//2160@25Hz
         case HDMI_VFRMT_3840x2160p30_16_9:
-            return 22; //2160@30Hz
+            return limit_to_720p ? -1 :22; //2160@30Hz
         case HDMI_VFRMT_4096x2160p24_16_9:
-            return 23; //4kx2k@24Hz
+            return limit_to_720p ? -1 :23; //4kx2k@24Hz
     }
 }
 
