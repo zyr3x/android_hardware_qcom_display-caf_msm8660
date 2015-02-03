@@ -370,11 +370,6 @@ inline void swap(T& a, T& b) {
 int getSocIdFromSystem();
 }; //qhwc namespace
 
-enum eAnimationState{
-    ANIMATION_STOPPED,
-    ANIMATION_STARTED,
-};
-
 // -----------------------------------------------------------------------------
 // HWC context
 // This structure contains overall state
@@ -406,7 +401,11 @@ struct hwc_context_t {
     // stores the #numHwLayers of the previous frame
     // for each display device
     int mPrevHwLayerCount[HWC_NUM_DISPLAY_TYPES];
-    eAnimationState mAnimationState[HWC_NUM_DISPLAY_TYPES];
+    
+    hwc_rect_t mPrevCropVideo;
+    hwc_rect_t mPrevDestVideo;
+    int mPrevTransformVideo;
+    
     // stores the primary device orientation
     int deviceOrientation;
     //Securing in progress indicator

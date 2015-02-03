@@ -448,6 +448,21 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
         hwc_layer_1_t* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
+	 if((layer->planeAlpha < 0xFF) &&
+                qhwc::needsScaling(ctx,layer,mDpy)){
+            ALOGD_IF(isDebug(),
+                "%s: Disable mixed mode if frame needs plane alpha downscaling",
+                __FUNCTION__);
+            return false;
+        }
+
+        // If buffer is non contiguous then force GPU comp
+        if(isNonContigBuffer(hnd) && ctx->mMDP.version > qdutils::MDP_V4_3) {
+            ALOGD_IF(isDebug(), "%s: Buffer is Non contiguous,"
+                                "so mdpcomp is not possible",__FUNCTION__);
+            return false;
+        }
+	
         // check for downscale mode which requires scaling.
         if(ctx->dpyAttr[mDpy].mDownScaleMode && qhwc::isAlphaPresent(layer)) {
             ALOGD_IF(isDebug(),"%s: In mDownScaleMode scalling required",__FUNCTION__);
@@ -871,17 +886,11 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     // all the layers in FB and display FB content untill animation completes.
     if(ctx->listStats[mDpy].isDisplayAnimating) {
         mCurrentFrame.needsRedraw = false;
-        if(ctx->mAnimationState[mDpy] == ANIMATION_STOPPED) {
-            mCurrentFrame.needsRedraw = true;
-            ctx->mAnimationState[mDpy] = ANIMATION_STARTED;
-        }
         setMDPCompLayerFlags(ctx, list);
         mCachedFrame.updateCounts(mCurrentFrame);
         ret = -1;
         return ret;
-    } else {
-        ctx->mAnimationState[mDpy] = ANIMATION_STOPPED;
-    }
+    } 
 
     //Hard conditions, if not met, cannot do MDP comp
     if(!isFrameDoable(ctx, list)) {
