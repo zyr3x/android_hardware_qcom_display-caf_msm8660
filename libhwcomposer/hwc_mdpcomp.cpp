@@ -892,6 +892,22 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         return ret;
     } 
 
+     // Detect the start of animation and fall back to GPU only once to cache
+    // all the layers in FB and display FB content untill animation completes.
+    if(ctx->listStats[mDpy].isDisplayAnimating) {
+        mCurrentFrame.needsRedraw = false;
+        if(ctx->mAnimationState[mDpy] == ANIMATION_STOPPED) {
+            mCurrentFrame.needsRedraw = true;
+            ctx->mAnimationState[mDpy] = ANIMATION_STARTED;
+        }
+        setMDPCompLayerFlags(ctx, list);
+        mCachedFrame.updateCounts(mCurrentFrame);
+        ret = -1;
+        return ret;
+    } else {
+        ctx->mAnimationState[mDpy] = ANIMATION_STOPPED;
+    }
+
     //Hard conditions, if not met, cannot do MDP comp
     if(!isFrameDoable(ctx, list)) {
         ALOGD_IF( isDebug(),"%s: MDP Comp not possible for this frame",
