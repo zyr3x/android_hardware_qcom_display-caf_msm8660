@@ -199,6 +199,15 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
                  !ctx->listStats[dpy].isDisplayAnimating)
                 ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
 #endif
+        } else {
+            /* External Display is in Pause state.
+             * Mark all application layers as OVERLAY so that
+             * GPU will not compose.
+             */
+            for(size_t i = 0 ;i < (size_t)(list->numHwLayers - 1); i++) {
+                hwc_layer_1_t *layer = &list->hwLayers[i];
+                layer->compositionType = HWC_OVERLAY;
+            }
         }
     }
     return 0;
@@ -220,6 +229,15 @@ static int hwc_prepare_virtual(hwc_composer_device_1 *dev,
             if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
                 const int fbZ = 0;
                 ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
+            }
+        } else {
+            /* Virtual Display is in Pause state.
+             * Mark all application layers as OVERLAY so that
+             * GPU will not compose.
+             */
+            for(size_t i = 0 ;i < (size_t)(list->numHwLayers - 1); i++) {
+                hwc_layer_1_t *layer = &list->hwLayers[i];
+                layer->compositionType = HWC_OVERLAY;
             }
         }
     }
