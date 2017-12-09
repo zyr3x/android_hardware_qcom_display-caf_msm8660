@@ -192,7 +192,9 @@ int IonController::allocate(alloc_data& data, int usage)
 {
     int ionFlags = 0;
     int ret;
+#ifndef SECURE_MM_HEAP
     bool nonContig = false;
+#endif
 
     data.uncached = useUncached(usage);
     data.allocType = 0;
@@ -202,13 +204,17 @@ int IonController::allocate(alloc_data& data, int usage)
 
     if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP) {
         ionFlags |= ION_HEAP(ION_SYSTEM_HEAP_ID);
+#ifndef SECURE_MM_HEAP
         nonContig = true;
+#endif
     }
 
 #ifndef NO_IOMMU
     if(usage & GRALLOC_USAGE_PRIVATE_IOMMU_HEAP) {
         ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
+#ifndef SECURE_MM_HEAP
         nonContig = true;
+#endif
     }
 #endif
 
@@ -224,7 +230,7 @@ int IonController::allocate(alloc_data& data, int usage)
         }
     } else
 #endif
-       if(usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
+    if(usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
 #ifdef SECURE_MM_HEAP
         //MM Heap is exclusively a secure heap.
         //If it is used for non secure cases, fallback to IOMMU heap
@@ -271,14 +277,16 @@ int IonController::allocate(alloc_data& data, int usage)
     {
         ALOGW("Falling back to system heap");
         data.flags = ION_HEAP(ION_SYSTEM_HEAP_ID);
+#ifndef SECURE_MM_HEAP
         nonContig = true;
+#endif
         ret = mIonAlloc->alloc_buffer(data);
     }
 
     if(ret >= 0 ) {
         data.allocType |= private_handle_t::PRIV_FLAGS_USES_ION;
 #ifdef SECURE_MM_HEAP
-        if (nonContig)
+        if(nonContig)
             data.allocType |= private_handle_t::PRIV_FLAGS_NONCONTIGUOUS_MEM;
         if(ionFlags & ION_SECURE)
             data.allocType |= private_handle_t::PRIV_FLAGS_SECURE_BUFFER;
@@ -393,6 +401,70 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
 
     return size;
 }
+
+int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
+{
+    int err = 0;
+    size_t ystride, cstride;
+    memset(ycbcr->reserved, 0, sizeof(ycbcr->reserved));
+
+    // Get the chroma offsets from the handle width/height. We take advantage
+    // of the fact the width _is_ the stride
+    switch (hnd->format) {
+        //Semiplanar
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE: //Same as YCbCr_420_SP_VENUS
+            ystride = cstride = hnd->width;
+            ycbcr->y  = (void*)hnd->base;
+            ycbcr->cb = (void*)(hnd->base + ystride * hnd->height);
+           ycbcr->cr = (void*)(hnd->base + ystride * hnd->height + 1);
+            ycbcr->ystride = ystride;
+            ycbcr->cstride = cstride;
+            ycbcr->chroma_step = 2;
+        break;
+
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_422_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
+        case HAL_PIXEL_FORMAT_NV21_ZSL:
+        case HAL_PIXEL_FORMAT_RAW_SENSOR:
+            ystride = cstride = hnd->width;
+            ycbcr->y  = (void*)hnd->base;
+            ycbcr->cr = (void*)(hnd->base + ystride * hnd->height);
+            ycbcr->cb = (void*)(hnd->base + ystride * hnd->height + 1);
+            ycbcr->ystride = ystride;
+            ycbcr->cstride = cstride;
+            ycbcr->chroma_step = 2;
+        break;
+
+        //Planar
+        case HAL_PIXEL_FORMAT_YV12:
+            ystride = hnd->width;
+            cstride = ALIGN(hnd->width/2, 16);
+            ycbcr->y  = (void*)hnd->base;
+            ycbcr->cr = (void*)(hnd->base + ystride * hnd->height);
+            ycbcr->cb = (void*)(hnd->base + ystride * hnd->height +
+                    cstride * hnd->height/2);
+            ycbcr->ystride = ystride;
+            ycbcr->cstride = cstride;
+            ycbcr->chroma_step = 1;
+
+       break;
+        //Unsupported formats
+        case HAL_PIXEL_FORMAT_YCbCr_422_I:
+        case HAL_PIXEL_FORMAT_YCrCb_422_I:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
+        default:
+        ALOGD("%s: Invalid format passed: 0x%x", __FUNCTION__,
+                hnd->format);
+        err = -EINVAL;
+    }
+    return err;
+
+}
+
 
 // Allocate buffer from width, height and format into a
 // private_handle_t. It is the responsibility of the caller
